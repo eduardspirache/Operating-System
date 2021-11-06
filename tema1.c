@@ -165,68 +165,81 @@ void rm(Dir *parent, char *name) {
 		printf("Could not find the file\n");
 }
 
-void __rmdir(Dir *my_dir) {
-	if (my_dir == NULL) {
-		return;
+void __rmdir(Dir *target) { // target = d1
+	Dir* parent_directory = target->head_children_dirs; // parent = d3
+	Dir* child_directory;
+	File* nested_files;
+	File* next_file;
+
+	// Printam numele directorului parinte
+STEP1:
+	// Verfificam daca directorul curent (parinte) are un alt director
+	// inauntrul sau. Daca are, reluam pasul pana ajungem la ultimul director.
+	child_directory = parent_directory->head_children_dirs; // NULL
+	if (child_directory != NULL) {
+		parent_directory = child_directory; // d4
+		goto STEP1;
+	} else {
+STEP2:
+		// Am ajuns la ultimul director si verificam daca are fisiere
+		// in el pe care sa le stergem. Dupa ce le stergem, setam head-ul NULL
+
+		nested_files = parent_directory->head_children_files; //NULL
+		if(nested_files != NULL) {
+			next_file = nested_files->next;
+			while (next_file != NULL) {
+				free(nested_files->name);
+				free(nested_files);
+				next_file = next_file->next;
+			}
+			parent_directory->head_children_files = NULL;
+		}	
+		// Dupa ce stergem fisierele, mergem inapoi cu un director,
+		// astfel child devine parent si parent "grandparent".
+		child_directory = parent_directory; //d4
+		parent_directory = parent_directory->parent; // d3
+		
+		// Stergem directorul copil din care am plecat
+		if(child_directory->head_children_dirs != NULL) {
+			free(child_directory->head_children_dirs->name);
+			free(child_directory->head_children_dirs);
+		}
+		
+		// Daca parintele depaseste directorul unde am executat functia
+		// rmdir, atunci programul se opreste
+		if (parent_directory == target) // parent == d1
+			return;
+		
+		// Daca exista un alt director in directorul parinte,
+		// reluam pasul 1 pentru acel director.
+		// Daca nu exista, atunci verificam existenta fisierelor in
+		// directorul parinte, asadar reluam pasul 2.
+		if (child_directory->next != NULL) {
+			parent_directory = child_directory->next;
+			goto STEP1;
+		} else {
+			goto STEP2;
+		}
 	}
-
-	// Iteram prin directoarele din directorul pe care dorim 
-	// sa il stergem pana ajungem la ultimul director din lista
-	Dir* last_dir = my_dir->head_children_dirs;
-	while (last_dir->next != NULL) {
-		last_dir = last_dir->next;
-	}
-
-	// Repetam procesul pana ajungem la ultimul director din ierarhie
-	__rmdir(last_dir);
-
-	// Ajunsi la ultimul director, stergem toate fisierele din acesta
-	File* current_file = last_dir->head_children_files;
-	File* next_file = current_file->next;
-	while (next_file != NULL) {
-		free(current_file->name);
-		free(current_file);
-		next_file = next_file->next;
-	}
-	last_dir->head_children_files = NULL;
-
-	// Apoi stergem toate directoarele din acesta
-	Dir* current_dir = last_dir->head_children_dirs;
-	Dir* next_dir = current_dir->next;
-	while (next_dir != NULL) {
-		free(current_dir->name);
-		free(current_dir);
-		next_dir = next_dir->next;
-	}
-	last_dir->head_children_dirs = NULL;
-
-	// In final, stergem directorul
-	free(last_dir->name);
-	free(last_dir);
 }
 
 void rmdir(Dir *parent, char *name) {
-	Dir* current;
-	printf("DA\n");
 	// Cazul 1 - directorul cautat este primul din directorul parinte
 	if (parent->head_children_dirs != NULL &&
 		!strcmp(parent->head_children_dirs->name, name)) {
 		printf("Caz 1\n");
-		// Current este setat pe al doilea director din lista, fie el si null
-		current = parent->head_children_dirs->next;
-		__rmdir(parent->head_children_dirs->head_children_dirs);
-		printf("Caz 1b\n");
-		free(parent->head_children_dirs->name);
-		free(parent->head_children_dirs);
-		parent->head_children_dirs = current;
+		Dir *new_head;
+		// new_head este setat pe al doilea director din lista, fie el si null
+		new_head = parent->head_children_dirs->next;
+		__rmdir(parent->head_children_dirs);
+		parent->head_children_dirs = new_head;
 		return;
 	}
 
-	current = parent->head_children_dirs;
+	Dir* current = parent->head_children_dirs;
 
 	// Cazul 2 - directorul este diferit de primul din directorul parinte
 	while (current != NULL) {
-		printf("Caz 2\n");
 		Dir* prev = current;
 		current = current->next;
 		
@@ -237,10 +250,9 @@ void rmdir(Dir *parent, char *name) {
 
 		if (!strcmp(current->name, name)) {
 			prev->next = current->next;
-			__rmdir(current->head_children_dirs);
-			printf("Caz 2b\n");
-			free(current->name);
-			free(current);
+			if(current->next != NULL)
+				current->next->parent = prev;
+			__rmdir(current);
 			return;
 		}
 	}
@@ -288,50 +300,7 @@ char *pwd(Dir *target) {
 	return to_print;
 }
 
-void stop(Dir *target) {
-	Dir* parent_directory = target->head_children_dirs;
-	Dir* child_directory;
-	File* nested_files;
-
-	// Printam numele directorului parinte
-STEP1:
-	// Verfificam daca directorul curent (parinte) are un alt director
-	// inauntrul sau. Daca are, reluam pasul pana ajungem la ultimul director.
-	child_directory = parent_directory->head_children_dirs;
-	if (child_directory != NULL) {
-		parent_directory = child_directory; 
-		goto STEP1;
-	} else {
-STEP3:
-		// Am ajuns la ultimul director si verificam daca are fisiere
-		// in el pe care sa le stergem.
-		nested_files = parent_directory->head_children_files;
-		while (nested_files != NULL) {
-			
-			nested_files = nested_files->next;
-		}
-		// Dupa ce printam fisierele, mergem inapoi cu un director,
-		// astfel child devine parent si parent "grandparent"
-		child_directory = parent_directory;
-		parent_directory = parent_directory->parent;
-
-		// Daca parintele depaseste directorul unde am executat functia
-		// tree, atunci programul se opreste
-		if (parent_directory == target->parent)
-			return;
-		
-		// Daca exista un alt director in directorul parinte,
-		// reluam pasul 1 pentru acel director.
-		// Daca nu exista, atunci verificam existenta fisierelor in
-		// directorul parinte, asadar reluam pasul 3.
-		if (child_directory->next != NULL) {
-			parent_directory = child_directory->next;
-			goto STEP1;
-		} else {
-			goto STEP3;
-		}
-	}
-}
+void stop(Dir *target) {}
 
 void print_spaces(int level) {
 	while(level > 0) {
@@ -365,10 +334,8 @@ STEP3:
 		// Daca directorul curent (parinte) nu are alt director in el,
 		// atunci printam fisierele
 		nested_files = parent_directory->head_children_files;
-		if (nested_files != NULL) {
-			print_spaces(level);
-		}
 		while (nested_files != NULL) {
+			print_spaces(level);
 			printf("%s\n", nested_files->name); 
 			nested_files = nested_files->next;
 		}
@@ -435,8 +402,7 @@ int main()
 			printf("%s\n", to_print);
 			free(to_print);
 		} else if (!strcmp(function, "stop")) {
-			free(home->head_children_dirs->name);
-			free(home->head_children_dirs);
+			__rmdir(home);
 			// Dealocam main-ul
 			free(home->name);
 			free(home);
