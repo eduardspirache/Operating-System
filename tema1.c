@@ -4,6 +4,7 @@
 #include <string.h>
 
 #define MAX_INPUT_LINE_SIZE 300
+#define MAX_PATH_SIZE 300
 
 // valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./tema
 
@@ -270,46 +271,43 @@ void cd(Dir **target, char *name) {
 		printf("No directories found!\n");
 }
 
-char *pwd(Dir *target) {}
+char *pwd(Dir *target) {
+	Dir* current = target;
+	char *to_concatenate = malloc(MAX_PATH_SIZE);
+	char *to_print = malloc(MAX_PATH_SIZE);
 
-void stop(Dir *target) {}
-
-void print_spaces(int level) {
-	while(level) {
-		level --;
-		printf("    ");
+	while(current != NULL) {
+		strcpy(to_concatenate, "/");
+		strcat(to_concatenate, current->name);
+		strcat(to_concatenate, to_print);
+		strcpy(to_print, to_concatenate);
+		
+		current = current->parent;
 	}
+	free(to_concatenate);
+	return to_print;
 }
 
-void tree(Dir *target) {
-	int level = 0;
+void stop(Dir *target) {
 	Dir* parent_directory = target->head_children_dirs;
 	Dir* child_directory;
 	File* nested_files;
-	// De tinut minte sa ne oprim cand ajungem la parintele lui d1
 
 	// Printam numele directorului parinte
 STEP1:
-	print_spaces(level);
-	printf("%s\n", parent_directory->name);
-
 	// Verfificam daca directorul curent (parinte) are un alt director
-	// inauntrul sau. Daca are, printam directorul, incrementam nivelul
-	// si reluam pasul 1.
-STEP2:
+	// inauntrul sau. Daca are, reluam pasul pana ajungem la ultimul director.
 	child_directory = parent_directory->head_children_dirs;
-
 	if (child_directory != NULL) {
 		parent_directory = child_directory; 
-		level ++;
 		goto STEP1;
 	} else {
 STEP3:
-		// Daca am ajuns la capatul nestingului de directoare
-		// verificam daca aici exista fisiere si le printam
+		// Am ajuns la ultimul director si verificam daca are fisiere
+		// in el pe care sa le stergem.
 		nested_files = parent_directory->head_children_files;
 		while (nested_files != NULL) {
-			printf("%s\n", nested_files->name); 
+			
 			nested_files = nested_files->next;
 		}
 		// Dupa ce printam fisierele, mergem inapoi cu un director,
@@ -328,11 +326,71 @@ STEP3:
 		// directorul parinte, asadar reluam pasul 3.
 		if (child_directory->next != NULL) {
 			parent_directory = child_directory->next;
-			//level --;
 			goto STEP1;
 		} else {
+			goto STEP3;
+		}
+	}
+}
+
+void print_spaces(int level) {
+	while(level > 0) {
+		level --;
+		printf("    ");
+	}
+}
+
+void tree(Dir *target) {
+	int level = 0;
+	Dir* parent_directory = target->head_children_dirs;
+	Dir* child_directory;
+	File* nested_files;
+
+	// Printam numele directorului parinte
+STEP1:
+	print_spaces(level);
+	printf("%s\n", parent_directory->name);
+
+	// Verfificam daca directorul curent (parinte) are un alt director
+	// inauntrul sau. Daca are, printam directorul
+	// si reluam pasul 1.
+STEP2:
+	child_directory = parent_directory->head_children_dirs;
+	level ++;
+	if (child_directory != NULL) {
+		parent_directory = child_directory; 
+		goto STEP1;
+	} else {
+STEP3:
+		// Daca directorul curent (parinte) nu are alt director in el,
+		// atunci printam fisierele
+		nested_files = parent_directory->head_children_files;
+		if (nested_files != NULL) {
 			print_spaces(level);
-			level --;
+		}
+		while (nested_files != NULL) {
+			printf("%s\n", nested_files->name); 
+			nested_files = nested_files->next;
+		}
+		// Dupa ce printam fisierele, mergem inapoi cu un director,
+		// astfel child devine parent si parent "grandparent"
+		child_directory = parent_directory;
+		parent_directory = parent_directory->parent;
+		level --;
+
+		// Daca parintele depaseste directorul unde am executat functia
+		// tree, atunci programul se opreste
+		if (parent_directory == target->parent)
+			return;
+		
+		// Daca exista un alt director in directorul parinte,
+		// reluam pasul 1 pentru acel director.
+		// Daca nu exista, atunci verificam existenta fisierelor in
+		// directorul parinte, asadar reluam pasul 3.
+		if (child_directory->next != NULL) {
+			parent_directory = child_directory->next;
+			goto STEP1;
+		} else {
 			goto STEP3;
 		}
 	}
@@ -373,7 +431,9 @@ int main()
 		} else if (!strcmp(function, "tree")) {
 			tree(home);
 		} else if (!strcmp(function, "pwd")) {
-			printf("%s\n", pwd(home));
+			char *to_print = pwd(home);
+			printf("%s\n", to_print);
+			free(to_print);
 		} else if (!strcmp(function, "stop")) {
 			free(home->head_children_dirs->name);
 			free(home->head_children_dirs);
