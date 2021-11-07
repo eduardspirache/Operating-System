@@ -215,14 +215,15 @@ STEP2:
 			free(current_file);
 
 			parent_directory->head_children_files = NULL;
-			// Daca "ok"-ul nostru devine este 0, inseamna ca mergem pe
-			// primul caz si este suficient sa ne oprim dupa ce stergem
-			// fisierele din director.
-			if (ok == 0) {
-				free(parent_directory->name);
-				free(parent_directory);
-				return;
-			}
+			
+		}
+		// Daca "ok"-ul nostru devine este 0, inseamna ca mergem pe
+		// primul caz si este suficient sa ne oprim dupa ce stergem
+		// fisierele din director.
+		if (ok == 0) {
+			free(parent_directory->name);
+			free(parent_directory);
+			return;
 		}	
 		// Dupa ce stergem fisierele, mergem inapoi cu un director,
 		// astfel child devine parent si parent "grandparent".
@@ -236,11 +237,11 @@ STEP2:
 		}
 		
 		// Daca parintele depaseste directorul unde am executat functia
-		// rmdir, atunci programul se opreste
+		// rmdir, atunci programul verifica daca avem fisiere in director
+		// si le stergem
 		if (parent_directory == target) {
-			free(parent_directory->name);
-			free(parent_directory);
-			return;
+			ok = 0;
+			goto STEP2;
 		}
 		
 		// Daca exista un alt director in directorul parinte,
@@ -387,7 +388,7 @@ STEP3:
 		nested_files = parent_directory->head_children_files;
 		while (nested_files != NULL) {
 			print_spaces(level);
-			printf("%s\n", nested_files->name); 
+			printf("%s\n", nested_files->name);
 			nested_files = nested_files->next;
 		}
 		// Dupa ce printam fisierele, mergem inapoi cu un director,
