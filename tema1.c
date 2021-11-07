@@ -46,7 +46,7 @@ File *alloc_file(Dir *parent, char *name) {
 	DIE(my_file == NULL, "Eroare alocare fisier!\n");
 	my_file->name = malloc(sizeof(name)); 
 	DIE(my_file->name == NULL, "Eroare alocare nume fisier!\n");
-	memcpy(my_file->name, name, sizeof(*name));
+	memcpy(my_file->name, name, sizeof(name));
 	my_file->parent = parent;
 	my_file->next = NULL;
 	return my_file;
@@ -172,6 +172,10 @@ void __rmdir(Dir *target) {
 	File* next_file;
 	File* current_file;
 	int ok = 1;
+
+	// AICI E CEVA CIUDAT
+	printf("%s\n", target->name);
+	printf("%s\n", target->head_children_dirs->name);
 
 	// Pentru cazul in care in directorul nostru avem doar fisiere
 	// folosim "ok" pentru a confirma ca acesta este cazul pe care mergem
