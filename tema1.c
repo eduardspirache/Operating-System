@@ -218,8 +218,11 @@ STEP2:
 			// Daca "ok"-ul nostru devine este 0, inseamna ca mergem pe
 			// primul caz si este suficient sa ne oprim dupa ce stergem
 			// fisierele din director.
-			if (ok == 0)
+			if (ok == 0) {
+				free(parent_directory->name);
+				free(parent_directory);
 				return;
+			}
 		}	
 		// Dupa ce stergem fisierele, mergem inapoi cu un director,
 		// astfel child devine parent si parent "grandparent".
@@ -344,9 +347,6 @@ void stop(Dir *target) {
 		__rmdir(current_directory);
 	}
 	__rmdir(target);
-	free(target->name);
-	free(target);
-
 }
 
 void print_spaces(int level) {
