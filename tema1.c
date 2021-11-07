@@ -46,7 +46,7 @@ File *alloc_file(Dir *parent, char *name) {
 	DIE(my_file == NULL, "Eroare alocare fisier!\n");
 	my_file->name = malloc(sizeof(name)); 
 	DIE(my_file->name == NULL, "Eroare alocare nume fisier!\n");
-	memcpy(my_file->name, name, sizeof(name));
+	memcpy(my_file->name, name, sizeof(*name));
 	my_file->parent = parent;
 	my_file->next = NULL;
 	return my_file;
@@ -165,39 +165,66 @@ void rm(Dir *parent, char *name) {
 		printf("Could not find the file\n");
 }
 
-void __rmdir(Dir *target) { // target = d1
-	Dir* parent_directory = target->head_children_dirs; // parent = d3
+void __rmdir(Dir *target) {
+	Dir* parent_directory = target->head_children_dirs;
 	Dir* child_directory;
 	File* nested_files;
 	File* next_file;
+	File* current_file;
+	int ok = 1;
+
+	// Pentru cazul in care in directorul nostru avem doar fisiere
+	// folosim "ok" pentru a confirma ca acesta este cazul pe care mergem
+	// apoi sarim la "STEP2"
+	if (target->head_children_dirs == NULL) {
+		if (target->head_children_files != NULL) {
+			parent_directory = target;
+			ok = 0;
+			goto STEP2;
+		}
+		free(target->name);
+		free(target);
+		return;
+	}
 
 	// Printam numele directorului parinte
 STEP1:
 	// Verfificam daca directorul curent (parinte) are un alt director
 	// inauntrul sau. Daca are, reluam pasul pana ajungem la ultimul director.
-	child_directory = parent_directory->head_children_dirs; // NULL
+	child_directory = parent_directory->head_children_dirs;
 	if (child_directory != NULL) {
-		parent_directory = child_directory; // d4
+		parent_directory = child_directory;
 		goto STEP1;
 	} else {
 STEP2:
 		// Am ajuns la ultimul director si verificam daca are fisiere
 		// in el pe care sa le stergem. Dupa ce le stergem, setam head-ul NULL
 
-		nested_files = parent_directory->head_children_files; //NULL
+		nested_files = parent_directory->head_children_files;
 		if(nested_files != NULL) {
-			next_file = nested_files->next;
+			current_file = nested_files;
+			next_file = current_file->next;
+			
 			while (next_file != NULL) {
-				free(nested_files->name);
-				free(nested_files);
+				free(current_file->name);
+				free(current_file);
+				current_file = next_file;
 				next_file = next_file->next;
 			}
+			free(current_file->name);
+			free(current_file);
+
 			parent_directory->head_children_files = NULL;
+			// Daca "ok"-ul nostru devine este 0, inseamna ca mergem pe
+			// primul caz si este suficient sa ne oprim dupa ce stergem
+			// fisierele din director.
+			if (ok == 0)
+				return;
 		}	
 		// Dupa ce stergem fisierele, mergem inapoi cu un director,
 		// astfel child devine parent si parent "grandparent".
-		child_directory = parent_directory; //d4
-		parent_directory = parent_directory->parent; // d3
+		child_directory = parent_directory;
+		parent_directory = parent_directory->parent;
 		
 		// Stergem directorul copil din care am plecat
 		if(child_directory->head_children_dirs != NULL) {
@@ -207,8 +234,11 @@ STEP2:
 		
 		// Daca parintele depaseste directorul unde am executat functia
 		// rmdir, atunci programul se opreste
-		if (parent_directory == target) // parent == d1
+		if (parent_directory == target) {
+			free(parent_directory->name);
+			free(parent_directory);
 			return;
+		}
 		
 		// Daca exista un alt director in directorul parinte,
 		// reluam pasul 1 pentru acel director.
@@ -227,7 +257,6 @@ void rmdir(Dir *parent, char *name) {
 	// Cazul 1 - directorul cautat este primul din directorul parinte
 	if (parent->head_children_dirs != NULL &&
 		!strcmp(parent->head_children_dirs->name, name)) {
-		printf("Caz 1\n");
 		Dir *new_head;
 		// new_head este setat pe al doilea director din lista, fie el si null
 		new_head = parent->head_children_dirs->next;
@@ -262,9 +291,11 @@ void rmdir(Dir *parent, char *name) {
 }
 
 void cd(Dir **target, char *name) {
+
 	// Pentru "..", mergem in sus pe ierarhie
 	if (!strcmp(name, "..")) {
-		(*target) = (*target)->parent;
+		if((*target)->parent != NULL)
+			(*target) = (*target)->parent;
 		return;
 	}
 
@@ -300,7 +331,23 @@ char *pwd(Dir *target) {
 	return to_print;
 }
 
-void stop(Dir *target) {}
+void stop(Dir *target) {
+	if (target->head_children_dirs != NULL) {
+		Dir* current_directory = target->head_children_dirs;
+		Dir* next_directory = current_directory->next;
+
+		while (next_directory != NULL) {
+			__rmdir(current_directory);
+			current_directory = next_directory;
+			next_directory = next_directory->next;
+		}
+		__rmdir(current_directory);
+	}
+	__rmdir(target);
+	free(target->name);
+	free(target);
+
+}
 
 void print_spaces(int level) {
 	while(level > 0) {
@@ -310,6 +357,10 @@ void print_spaces(int level) {
 }
 
 void tree(Dir *target) {
+	if(target->head_children_dirs == NULL) {
+		return;
+	}
+
 	int level = 0;
 	Dir* parent_directory = target->head_children_dirs;
 	Dir* child_directory;
@@ -402,10 +453,11 @@ int main()
 			printf("%s\n", to_print);
 			free(to_print);
 		} else if (!strcmp(function, "stop")) {
-			__rmdir(home);
+			while(home->parent != NULL) {
+				home = home->parent;
+			}
+			stop(home);
 			// Dealocam main-ul
-			free(home->name);
-			free(home);
 			free(commands);
 			free(function);
 			free(argument);
