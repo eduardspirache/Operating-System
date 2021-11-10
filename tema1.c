@@ -62,7 +62,7 @@ void free_dir(Dir* target) {
 	}
 
 	Dir* current;
-
+	
 	// Cazul 1 - fisierul cautat este primul din director
 	if (parent->head_children_dirs != NULL &&
 		parent->head_children_dirs == target) {
@@ -219,21 +219,21 @@ void __rmdir(Dir *target) {
 	while (parent_directory != target->parent) {
 		// Stergem fisierele din interiorul directorului parinte
 		nested_files = parent_directory->head_children_files;
-			if(nested_files != NULL) {
-				current_file = nested_files;
-				next_file = current_file->next;
-				
-				while (next_file != NULL) {
-					free(current_file->name);
-					free(current_file);
-					current_file = next_file;
-					next_file = next_file->next;
-				}
+		if(nested_files != NULL) {
+		
+			current_file = nested_files;
+			next_file = current_file->next;
+			
+			while (next_file != NULL) {
 				free(current_file->name);
 				free(current_file);
-				parent_directory->head_children_files = NULL;
+				current_file = next_file;
+				next_file = next_file->next;
 			}
-
+			free(current_file->name);
+			free(current_file);
+			parent_directory->head_children_files = NULL;
+		}
 		// Iteram pana la capatul listei de directoare
 		if(parent_directory != NULL) {
 			if(parent_directory != target) {
@@ -255,10 +255,14 @@ void __rmdir(Dir *target) {
 			parent_directory = child_directory;
 		} else {
 			Dir *to_delete = parent_directory;
-			parent_directory = parent_directory->parent;
-			free_dir(to_delete);
-			if(parent_directory == NULL)
+
+			if(parent_directory->parent != target->parent) {
+				parent_directory = parent_directory->parent;
+				free_dir(to_delete);
+			} else {
+				free_dir(to_delete);
 				return;
+			}
 		}
 	}
 }
@@ -272,8 +276,8 @@ void rmdir(Dir *parent, char *name) {
 		to_delete = parent->head_children_dirs;
 		// current este setat pe al doilea director din lista, fie el si null
 		current = to_delete->next;
-		parent->head_children_dirs = current;
 		__rmdir(to_delete);
+		parent->head_children_dirs = current;
 		return;
 	}
 
@@ -290,10 +294,12 @@ void rmdir(Dir *parent, char *name) {
 			break;
 
 		if (!strcmp(current->name, name)) {
-			prev->next = current->next;
-			if(current->next != NULL)
-				current->next->parent = prev;
+			to_delete = current;
+			Dir* next = to_delete->next;
 			__rmdir(current);
+			prev->next = next;
+			if(next != NULL)
+				next->parent = prev;
 			return;
 		}
 	}
