@@ -6,8 +6,6 @@
 #define MAX_INPUT_LINE_SIZE 300
 #define MAX_PATH_SIZE 300
 
-// valgrind --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes ./tema
-
 struct Dir;
 struct File;
 
@@ -53,6 +51,9 @@ File *alloc_file(Dir *parent, char *name) {
 }
 
 void free_dir(Dir* target) {
+	Dir* to_delete;
+	Dir* next;
+
 	Dir* parent = target->parent;
 	// Daca dealocam HOME
 	if (parent == NULL) {
@@ -66,14 +67,16 @@ void free_dir(Dir* target) {
 	// Cazul 1 - fisierul cautat este primul din director
 	if (parent->head_children_dirs != NULL &&
 		parent->head_children_dirs == target) {
+		to_delete = parent->head_children_dirs;
+		next = to_delete->next;
+		if (next != NULL)
+			next->parent = to_delete->parent;
 		// Current este setat pe al doilea director din lista, fie el si null
-		current = parent->head_children_dirs->next;
 		free(parent->head_children_dirs->name);
 		free(parent->head_children_dirs);
-		parent->head_children_dirs = current;
+		parent->head_children_dirs = next;
 		return;
 	}
-
 	current = parent->head_children_dirs;
 
 	// Cazul 2 - directorul este diferit de primul din parinte
@@ -87,10 +90,15 @@ void free_dir(Dir* target) {
 			break;
 
 		if (current == target) {
-			prev->next = current->next;
-			free(current->name);
-			free(current);
+			to_delete = current;
+			next = to_delete->next;
+			free(to_delete->name);
+			free(to_delete);
+			prev->next = next;
+			if(next != NULL)
+				next->parent = prev;
 			return;
+			
 		}
 	}
 }
@@ -118,7 +126,7 @@ void touch(Dir *parent, char *name)
 			}
 			// Pentru a nu folosi inca un pointer care sa retina adresa
 			// precedenta a current, am folosit aceasta conditie.
-			if(current->next == NULL)
+			if (current->next == NULL)
 				break;
 			current = current->next;
 		}
@@ -148,7 +156,7 @@ void mkdir(Dir *parent, char *name)
 			}
 			// Pentru a nu folosi inca un pointer care sa retina adresa
 			// precedenta a current, am folosit aceasta conditie.
-			if(current->next == NULL)
+			if (current->next == NULL)
 				break;
 			current = current->next;
 		}
@@ -204,7 +212,7 @@ void rm(Dir *parent, char *name) {
 		}
 	}
 
-	if(current == NULL)
+	if (current == NULL)
 		printf("Could not find the file\n");
 }
 
@@ -219,7 +227,7 @@ void __rmdir(Dir *target) {
 	while (parent_directory != target->parent) {
 		// Stergem fisierele din interiorul directorului parinte
 		nested_files = parent_directory->head_children_files;
-		if(nested_files != NULL) {
+		if (nested_files != NULL) {
 		
 			current_file = nested_files;
 			next_file = current_file->next;
@@ -235,8 +243,8 @@ void __rmdir(Dir *target) {
 			parent_directory->head_children_files = NULL;
 		}
 		// Iteram pana la capatul listei de directoare
-		if(parent_directory != NULL) {
-			if(parent_directory != target) {
+		if (parent_directory != NULL) {
+			if (parent_directory != target) {
 				while (parent_directory->next != NULL) {
 					parent_directory = parent_directory->next;
 				}
@@ -249,14 +257,14 @@ void __rmdir(Dir *target) {
 		// pana pe ultima pozitie si reluam pasul pana ajungem la ultimul director
 		// al ultimului director
 			
-		if(child_directory != NULL) {
-			while(child_directory->next != NULL)
+		if (child_directory != NULL) {
+			while (child_directory->next != NULL)
 				child_directory = child_directory->next;
 			parent_directory = child_directory;
 		} else {
 			Dir *to_delete = parent_directory;
 
-			if(parent_directory->parent != target->parent) {
+			if (parent_directory->parent != target->parent) {
 				parent_directory = parent_directory->parent;
 				free_dir(to_delete);
 			} else {
@@ -304,7 +312,7 @@ void rmdir(Dir *parent, char *name) {
 		}
 	}
 
-	if(current == NULL)
+	if (current == NULL)
 		printf("Could not find the dir\n");
 }
 
@@ -337,7 +345,7 @@ char *pwd(Dir *target) {
 	char *to_concatenate = malloc(MAX_PATH_SIZE);
 	char *to_print = malloc(MAX_PATH_SIZE);
 
-	while(current != NULL) {
+	while (current != NULL) {
 		strcpy(to_concatenate, "/");
 		strcat(to_concatenate, current->name);
 		strcat(to_concatenate, to_print);
@@ -361,7 +369,7 @@ void print_spaces(int level) {
 }
 
 void tree(Dir *target) {
-	if(target->head_children_dirs == NULL) {
+	if (target->head_children_dirs == NULL) {
 		return;
 	}
 
@@ -564,6 +572,5 @@ int main()
 			break;
 		}
 	}
-
 	return 0;
 }
