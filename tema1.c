@@ -51,6 +51,33 @@ File *alloc_file(Dir *parent, char *name) {
 	my_file->next = NULL;
 	return my_file;
 }
+
+void free_dir(Dir* target) {
+	Dir* parent = target->parent;
+	// Daca directorul pe care il stergem are parinte
+	if (parent != NULL) {
+		// Verificam daca head-ul listei de directoare copii
+		// este chiar cel pe care dorim sa il stergem
+		// Daca este, head-ul listei parintelui devine NULL
+		if(parent->head_children_dirs == target) {
+			parent->head_children_dirs = NULL;
+		// Altfel, cautam in lista de directoare acel director
+		// si ne asiguram ca elementul de dinaintea sa pointeaza spre NULL
+		} else {
+			Dir *prev = parent->head_children_dirs;
+			Dir *to_delete = prev->next;
+			while (to_delete->next != target && to_delete->next != NULL) {
+				to_delete = to_delete->next;
+			}
+			if (to_delete->next != NULL) {
+				prev->next = to_delete->next;
+			}
+			to_delete = NULL;
+		}
+	}
+	free(target->name);
+	free(target);
+}
 //////////////////////////////////////////////////////////////////////////////
 
 void touch(Dir *parent, char *name)
@@ -173,10 +200,6 @@ void __rmdir(Dir *target) {
 	File* current_file;
 	int ok = 1;
 
-	// AICI E CEVA CIUDAT
-	printf("%s\n", target->name);
-	printf("%s\n", target->head_children_dirs->name);
-
 	// Pentru cazul in care in directorul nostru avem doar fisiere
 	// folosim "ok" pentru a confirma ca acesta este cazul pe care mergem
 	// apoi sarim la "STEP2"
@@ -186,8 +209,7 @@ void __rmdir(Dir *target) {
 			ok = 0;
 			goto STEP2;
 		}
-		free(target->name);
-		free(target);
+		free_dir(target);
 		return;
 	}
 
@@ -217,33 +239,34 @@ STEP2:
 			}
 			free(current_file->name);
 			free(current_file);
-
 			parent_directory->head_children_files = NULL;
-			
 		}
 		// Daca "ok"-ul nostru devine este 0, inseamna ca mergem pe
 		// primul caz si este suficient sa ne oprim dupa ce stergem
 		// fisierele din director.
 		if (ok == 0) {
-			free(parent_directory->name);
-			free(parent_directory);
+			free_dir(parent_directory);
 			return;
 		}	
 		// Dupa ce stergem fisierele, mergem inapoi cu un director,
 		// astfel child devine parent si parent "grandparent".
-		child_directory = parent_directory;
-		parent_directory = parent_directory->parent;
+		if (parent_directory != target) {
+			child_directory = parent_directory;
+			parent_directory = parent_directory->parent;
+		}
+		
 		
 		// Stergem directorul copil din care am plecat
 		if(child_directory->head_children_dirs != NULL) {
-			free(child_directory->head_children_dirs->name);
-			free(child_directory->head_children_dirs);
+			free_dir(child_directory->head_children_dirs);
 		}
+
 		
 		// Daca parintele depaseste directorul unde am executat functia
 		// rmdir, atunci programul verifica daca avem fisiere in director
 		// si le stergem
-		if (parent_directory == target) {
+		if (parent_directory == target
+			&& parent_directory->head_children_dirs == NULL) {
 			ok = 0;
 			goto STEP2;
 		}
@@ -256,6 +279,7 @@ STEP2:
 			parent_directory = child_directory->next;
 			goto STEP1;
 		} else {
+			free_dir(child_directory);
 			goto STEP2;
 		}
 	}
@@ -343,7 +367,6 @@ void stop(Dir *target) {
 	if (target->head_children_dirs != NULL) {
 		Dir* current_directory = target->head_children_dirs;
 		Dir* next_directory = current_directory->next;
-
 		while (next_directory != NULL) {
 			__rmdir(current_directory);
 			current_directory = next_directory;
@@ -419,7 +442,98 @@ STEP3:
 	}
 }
 
-void mv(Dir *parent, char *oldname, char *newname) {}
+void mv(Dir *parent, char *oldname, char *newname) {
+	// Verificam daca exista deja un fisier cu numele newname
+	Dir *check_newname_dir = parent->head_children_dirs;
+	File *check_newname_file = parent->head_children_files;
+
+	while (check_newname_dir != NULL) {
+		if (!strcmp(check_newname_dir->name, newname)) {
+			printf("File/Director already exists\n");
+			return;
+		}
+		check_newname_dir = check_newname_dir->next;
+	}
+
+	while (check_newname_file != NULL) {
+		if (!strcmp(check_newname_file->name, newname)) {
+			printf("File/Director already exists\n");
+			return;
+		}
+		check_newname_file = check_newname_file->next;
+	}
+
+	// Pentru Directoare
+	Dir *current_dir = parent->head_children_dirs;
+	Dir *prev_dir = current_dir;
+
+	while (current_dir != NULL) {		
+		if (!strcmp(current_dir->name, oldname)) {
+			// Daca primul director din lista este cel cautat,
+			// mutam directorul de pe a doua pozitie pe prima
+			if (current_dir == parent->head_children_dirs) {
+				if(current_dir->next == NULL) {
+					free(current_dir->name);
+					current_dir->name = malloc(sizeof(newname));
+					memcpy(current_dir->name, newname, sizeof(newname));
+					return;
+				}
+				parent->head_children_dirs = current_dir->next;
+			} else {
+			// Altfel facem directorul dinaintea celui cautat sa pointeze
+			// la directorul de dupa cel cautat
+				prev_dir->next = current_dir->next;
+			}
+			
+			// Schimbam numele directorului
+			free(current_dir->name);
+			current_dir->name = malloc(sizeof(newname));
+			memcpy(current_dir->name, newname, sizeof(newname));
+			// Iteram pana la finalul listei de directoare
+			// si mutam acolo "current"
+			while(prev_dir->next != NULL) {
+				prev_dir = prev_dir->next;
+			}
+			prev_dir->next = current_dir;
+			current_dir->next = NULL;
+			return;
+		}
+		prev_dir = current_dir;
+		current_dir = current_dir->next;
+	}
+	// Pentru Fisiere
+	File *current_file = parent->head_children_files;
+	File *prev_file = current_file;
+
+	while (current_file != NULL) {		
+		if (!strcmp(current_file->name, oldname)) {
+			if (current_file = parent->head_children_files) {
+				if(current_file->next == NULL) {
+					free(current_file->name);
+					current_file->name = malloc(sizeof(newname));
+					memcpy(current_file->name, newname, sizeof(newname));
+					return;
+				}
+				parent->head_children_files = current_file->next;
+			} else {
+				prev_file->next = current_file->next;
+			}
+			
+			free(current_file->name);
+			current_file->name = malloc(sizeof(newname));
+			memcpy(current_file->name, newname, sizeof(newname));
+			while(prev_file->next != NULL) {
+				prev_file = prev_file->next;
+			}
+			prev_file->next = current_file;
+			current_file->next = NULL;
+			return;
+		}
+		prev_file = current_file;
+		current_file = current_file->next;
+	}
+	printf("File/Director not found\n");
+}
 
 int main()
 {
@@ -457,18 +571,24 @@ int main()
 			char *to_print = pwd(home);
 			printf("%s\n", to_print);
 			free(to_print);
+		} else if(!strcmp(function, "mv")) {
+			char *newname = malloc(MAX_INPUT_LINE_SIZE);
+			sscanf(commands, "%s%s%s", function, argument, newname);
+			mv(home, argument, newname);
+			free(newname);
 		} else if (!strcmp(function, "stop")) {
+			return 0;
 			while(home->parent != NULL) {
 				home = home->parent;
 			}
-			stop(home);
+			//stop(home);
 			// Dealocam main-ul
 			free(commands);
 			free(function);
 			free(argument);
 			break;
 		}
-	} 
+	}
 
-	return 0;
+//	return 0;
 }
