@@ -264,18 +264,20 @@ void __rmdir(Dir *target) {
 }
 
 void rmdir(Dir *parent, char *name) {
+	Dir* current;
+	Dir* to_delete;
 	// Cazul 1 - directorul cautat este primul din directorul parinte
 	if (parent->head_children_dirs != NULL &&
 		!strcmp(parent->head_children_dirs->name, name)) {
-		Dir *new_head;
-		// new_head este setat pe al doilea director din lista, fie el si null
-		new_head = parent->head_children_dirs->next;
-		__rmdir(parent->head_children_dirs);
-		parent->head_children_dirs = new_head;
+		to_delete = parent->head_children_dirs;
+		// current este setat pe al doilea director din lista, fie el si null
+		current = to_delete->next;
+		parent->head_children_dirs = current;
+		__rmdir(to_delete);
 		return;
 	}
 
-	Dir* current = parent->head_children_dirs;
+	current = parent->head_children_dirs;
 
 	// Cazul 2 - directorul este diferit de primul din directorul parinte
 	while (current != NULL) {
@@ -342,16 +344,6 @@ char *pwd(Dir *target) {
 }
 
 void stop(Dir *target) {
-	/*if (target->head_children_dirs != NULL) {
-		Dir* current_directory = target->head_children_dirs;
-		Dir* next_directory = current_directory->next;
-		while (next_directory != NULL) {
-			__rmdir(current_directory);
-			current_directory = next_directory;
-			next_directory = next_directory->next;
-		}
-		__rmdir(current_directory);
-	}*/
 	__rmdir(target);
 }
 
