@@ -1,5 +1,8 @@
 build:
-	gcc tema1.c -g -o tema
+	gcc operating_system.c -g -o tema
+
+run:
+	./tema
 
 clean:
 	rm tema
