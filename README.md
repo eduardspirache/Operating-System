@@ -1,5 +1,5 @@
 # Operating-System
-This project implements a Linux file system using simple linked lists. All memory allocations are managed properly and no memory leaks occur throughout the project. Upon running the application, it will wait for inputs from stdin. Examples of commands are: touch f1, mkdir d1, rm f2, rmdir d2, ls, mv old_name new_name, etc. The commands will be explained below.
+This project was made in the 2nd year of university and implements a Linux file system using simple linked lists. All memory allocations are managed properly and no memory leaks occur throughout the project. Upon running the application, it will wait for inputs from stdin. Examples of commands are: touch f1, mkdir d1, rm f2, rmdir d2, ls, mv old_name new_name, etc. The commands will be explained below.
 
 # Commands
 1. touch: Creates a file in the current directory. <br>
